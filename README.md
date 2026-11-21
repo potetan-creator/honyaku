@@ -27,3 +27,14 @@
 MODのコードに直接書かれている一部の表示（`No hand` や `Irradiated!` など）は英語で表示されます。ゲーム内での見た目は未確認です。
 
 [翻訳元の英語ローカライズ](https://github.com/sup3p/JokerHub/blob/v2.0.1/localization/en-us.lua)
+
+## All In Jest 0.8.0
+
+1. [All In Jest 0.8.0](https://github.com/survovoaneend/All-In-Jest/releases/tag/0.8.0) を導入します。このリリースではSteamodded 26.1002系以降とLovely 0.10.0以上が必要です。
+2. [All In Jest用 ja.lua](All-In-Jest/localization/ja.lua) を開き、右上の **Download raw file** からダウンロードします。
+3. `ja.lua` をAll In Jest本体の `localization` フォルダに入れます。既存の `default.lua` と同じ場所です。
+4. Balatroを再起動し、ゲーム内の言語を日本語に設定します。
+
+部分翻訳です。設定、デッキ、チャレンジ8種、ポリクロームステークの難易度設定、ピットブラインド21種、惑星・スペクトル・アストラル・タロットカード、バウチャー、ジョーカー20種などを収録しています。未翻訳のジョーカーやブラインドなどには、元の英語が表示されます。ゲーム内での表示は未確認です。
+
+「チップ」「倍率」「スート」などは [Balatroの日本語表記](https://www.playbalatro.com/ja/faq/) に合わせています。翻訳元は [All In Jest 0.8.0 のローカライズ](https://github.com/survovoaneend/All-In-Jest/tree/0.8.0/localization) です。
