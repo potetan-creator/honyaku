@@ -1,0 +1,26 @@
+name: Collect Windows Desktop .NET 10 reference libraries
+on:
+  push:
+    branches:
+      - chatgpt/cdshelper-startup-diagnosis-20261126
+jobs:
+  refs:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Collect Windows Desktop reference DLLs
+        shell: pwsh
+        run: |
+          $candidates=@(Get-ChildItem "C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending)
+          if($candidates.Count -eq 0) { throw 'No WindowsDesktop.Ref pack available' }
+          $src=Join-Path $candidates[0].FullName 'ref\net10.0'
+          New-Item -ItemType Directory refs -Force | Out-Null
+          Copy-Item (Join-Path $src '*.dll') refs -Force
+          Write-Host "COPIED $((Get-ChildItem refs).Count) WindowsDesktop reference assemblies"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windowsdesktop-net10-refs
+          path: refs/*
