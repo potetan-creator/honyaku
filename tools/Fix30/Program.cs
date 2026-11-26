@@ -50,9 +50,10 @@ int cultureStrings=Sync(ctor,i=>i.Operand is MethodReference mr&&mr.Name=="ToStr
 if(cultureStrings<1)throw new Exception("Cannot patch culture label creation");
 
 var fillTargets=spar.Methods.Single(m=>m.Name=="FillTargets"&&m.HasBody);
-int targetStrings=Sync(fillTargets,i=>i.Operand is MethodReference mr&&mr.Name=="ToStringAndClear"&&mr.ReturnType.FullName=="System.String",
+int targetStrings=Sync(fillTargets,i=>i.Operand is MethodReference mr&&mr.ReturnType.FullName=="System.String"&&
+  (mr.Name=="ToStringAndClear"||(mr.Name=="Concat"&&mr.DeclaringType.FullName=="System.String")),
  "City/person target dropdown labels");
-if(targetStrings<2)throw new Exception("Cannot patch both target label sources");
+if(targetStrings<2)throw new Exception("Cannot patch both target label sources: "+targetStrings);
 
 // UserDiscoveryDialog's sample data are source Korean text; translate for display only.
 // Never edit the original example Entry, copied user discovery, save contents or event data.
