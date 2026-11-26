@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 
 if(args.Length != 3) throw new Exception("Usage: Fix28 input-Fix27.dll output-Fix28.dll WindowsDesktop-ref-dir");
@@ -77,7 +76,9 @@ log.Add("Free mode PickedTarget: -1, without changing Town/Field target selectio
 var fill=Method(spar,"FillTargets");
 var top=fill.Body.Instructions[0];
 var targetField=Field(spar,"_target");
-var setEnabled=module.ImportReference(typeof(System.Windows.UIElement).GetProperty("IsEnabled")!.SetMethod!);
+var wpfCore=ModuleDefinition.ReadModule(Path.Combine(args[2],"PresentationCore.dll"));
+var wpfElement=wpfCore.GetType("System.Windows.UIElement")??throw new Exception("UIElement absent from WPF ref");
+var setEnabled=module.ImportReference(wpfElement.Methods.Single(m=>m.Name=="set_IsEnabled"&&m.Parameters.Count==1));
 var fillil=fill.Body.GetILProcessor();
 var manualTargets=new Instruction[]{
  Instruction.Create(OpCodes.Ldarg_0),
