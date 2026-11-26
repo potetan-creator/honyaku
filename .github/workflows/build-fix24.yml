@@ -1,0 +1,24 @@
+name: Build Fix24 targeted Japanese and search patcher
+on:
+  push:
+    branches:
+      - chatgpt/cdshelper-fix24-japanese-search-20261126
+jobs:
+  compile:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish Linux compatible Mono.Cecil editor
+        shell: pwsh
+        run: |
+          dotnet publish tools/Fix24/Fix24.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o output --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fix24-IL-Editor
+          path: output/*
+          if-no-files-found: error
