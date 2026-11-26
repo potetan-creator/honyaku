@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-if(args.Length != 4) throw new Exception("Usage: Fix28 input-Fix27.dll output-Fix28.dll WindowsDesktop-ref-dir Fix28-donor.dll");
+if(args.Length != 3) throw new Exception("Usage: Fix28 input-Fix27.dll output-Fix28.dll WindowsDesktop-ref-dir");
 var source=Path.GetFullPath(args[0]);
 var dest=Path.GetFullPath(args[1]);
 if(source==dest)throw new Exception("The original DLL must not be overwritten.");
@@ -308,73 +308,9 @@ foreach(var i in pickFill.Body.Instructions.Where(i=>i.Operand is MethodReferenc
 if(translated!=1)throw new Exception("Could not localize boss list name: "+translated);
 log.Add("LandBattlePicker displays translated names without modifying script names.");
 
-// Copy a precompiled, dependency-free battle summary method into the existing game
-// assembly. This is a display-only preview; it never mutates the battle.
-var donorAssembly=ModuleDefinition.ReadModule(args[3]);
-var donorMethod=donorAssembly.Types.Single(x=>x.Name=="BattlePreviewDonor").Methods.Single(x=>x.Name=="Build");
-var preview=new MethodDefinition("ShowAppliedBattlePreviewText",MethodAttributes.Private|MethodAttributes.Static|MethodAttributes.HideBySig,
-  module.ImportReference(donorMethod.ReturnType));
-foreach(var p in donorMethod.Parameters)preview.Parameters.Add(new ParameterDefinition(p.Name,p.Attributes,module.ImportReference(p.ParameterType)));
-spar.Methods.Add(preview);
-var fromBody=donorMethod.Body;
-var toBody=new Mono.Cecil.Cil.MethodBody(preview){InitLocals=fromBody.InitLocals,MaxStackSize=fromBody.MaxStackSize};
-preview.Body=toBody;
-foreach(var v in fromBody.Variables)toBody.Variables.Add(new VariableDefinition(module.ImportReference(v.VariableType)));
-var instrMap=new Dictionary<Instruction,Instruction>();
-foreach(var i in fromBody.Instructions){var d=Instruction.Create(OpCodes.Nop);d.OpCode=i.OpCode;toBody.Instructions.Add(d);instrMap.Add(i,d);}
-foreach(var i in fromBody.Instructions){
- var d=instrMap[i];
- d.Operand=i.Operand switch {
-  null=>null,
-  Instruction j=>instrMap[j],
-  Instruction[] js=>js.Select(j=>instrMap[j]).ToArray(),
-  VariableDefinition v=>toBody.Variables[fromBody.Variables.IndexOf(v)],
-  ParameterDefinition p=>preview.Parameters[donorMethod.Parameters.IndexOf(p)],
-  MethodReference m=>module.ImportReference(m),
-  FieldReference f=>module.ImportReference(f),
-  TypeReference t=>module.ImportReference(t),
-  _=>i.Operand
- };
-}
-foreach(var e in fromBody.ExceptionHandlers){
- toBody.ExceptionHandlers.Add(new ExceptionHandler(e.HandlerType){
-  CatchType=e.CatchType==null?null:module.ImportReference(e.CatchType),
-  TryStart=e.TryStart==null?null:instrMap[e.TryStart],
-  TryEnd=e.TryEnd==null?null:instrMap[e.TryEnd],
-  HandlerStart=e.HandlerStart==null?null:instrMap[e.HandlerStart],
-  HandlerEnd=e.HandlerEnd==null?null:instrMap[e.HandlerEnd],
-  FilterStart=e.FilterStart==null?null:instrMap[e.FilterStart]
- });
-}
-var sceneRun=play.Body.Instructions.Single(i=>i.Operand is MethodReference mr&&mr.Name=="Run"&&mr.DeclaringType.FullName.Contains("LandBattleScene"));
-var beginScene=sceneRun.Previous?.Previous?.Previous?.Previous;
-if(beginScene?.OpCode!=OpCodes.Ldarg_0)throw new Exception("Expected scene invocation starts with owner arg");
-var messageBox=Method(spar,"Decide").Body.Instructions.Select(i=>i.Operand).OfType<MethodReference>()
- .First(x=>x.Name=="Show"&&x.DeclaringType.FullName=="System.Windows.MessageBox"&&x.Parameters.Count==5);
-var sceneIl=play.Body.GetILProcessor();
-var firstPreview=Instruction.Create(OpCodes.Ldarg_0);
-var oldBranches=play.Body.Instructions
- .Where(i=>ReferenceEquals(i.Operand,beginScene)).ToArray();
-var ops=new Instruction[]{
- firstPreview,
- Instruction.Create(OpCodes.Ldloc,play.Body.Variables[4]),
- Instruction.Create(OpCodes.Ldloca,play.Body.Variables[0]),
- Instruction.Create(OpCodes.Call,Method(Type("CdsHelper.Game.UI.Views.LandSparDialog/Setup"),"get_Sort")),
- Instruction.Create(OpCodes.Ldloca,play.Body.Variables[0]),
- Instruction.Create(OpCodes.Call,Method(Type("CdsHelper.Game.UI.Views.LandSparDialog/Setup"),"get_Target")),
- Instruction.Create(OpCodes.Call,preview),
- Instruction.Create(OpCodes.Ldstr,"野戦テスト：適用設定の確認"),
- Instruction.Create(OpCodes.Ldc_I4_4), // MessageBoxButton.YesNo
- Instruction.Create(OpCodes.Ldc_I4_0), // MessageBoxImage.None
- Instruction.Create(OpCodes.Call,messageBox),
- Instruction.Create(OpCodes.Ldc_I4_6), // MessageBoxResult.Yes
- Instruction.Create(OpCodes.Beq,beginScene),
- Instruction.Create(OpCodes.Ret)
-};
-foreach(var i in ops)sceneIl.InsertBefore(beginScene,i);
-foreach(var br in oldBranches)br.Operand=firstPreview;
-log.Add("Before battle launch: show ACTUAL battlefield, culture, opponent mode, both side unit kinds and soldiers; No cancels launch.");
-log.Add("Battle auto-generation code and pre-existing equipment engine retained unchanged.");
+// No pre-battle confirmation dialog. The chosen configuration must be reflected
+// directly by LandBattleScene (terrain background, unit types and actual force size).
+log.Add("No popup added; battle screen itself reflects applied terrain, culture, troops.");
 
 var playFinal=string.Join("\n",play.Body.Instructions.Select(x=>x.OpCode.Code+"|"+x.Operand?.ToString()));
 var battleFinal=string.Join("\n",battle.Methods.Where(m=>m.IsConstructor&&!m.IsStatic)
