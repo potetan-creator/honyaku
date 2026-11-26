@@ -62,6 +62,23 @@ foreach (var type in types.Where(t=>t.FullName.Contains("DuelFoeDialog") || t.Fu
   }
  }
 }
+// Original discovery scripts store their choice labels outside Japanese script-line tables.
+// Translate each trimmed menu choice in one shared place. Keep array lengths and indices unchanged.
+int choicePatches = 0;
+foreach (var t in types.Where(t => t.FullName.StartsWith("CdsHelper.Game.Engine.Disev.DisevRunner/")))
+foreach (var m in t.Methods.Where(m => m.Name.Contains("<Choose>") && m.HasBody))
+{
+ foreach (var ins in m.Body.Instructions.ToArray())
+ {
+  if (ins.Operand is not MethodReference call || call.DeclaringType.FullName != "System.String"
+     || call.Name != "Trim" || call.Parameters.Count != 0) continue;
+  AddTranslationAfter(m, ins, "Village / discovery / story choice labels");
+  choicePatches++;
+ }
+}
+if (choicePatches != 1) throw new Exception("Expected exactly 1 choice translator, found "+choicePatches+". No DLL written.");
+log.Add("DISCOVERY MENU: all menu options now use Lang.T; menu indices unchanged.");
+
 if(searchPatches<1) throw new Exception("Duel search patch not found. No DLL was written.");
 log.Add("Search patches "+searchPatches+"; translated display names "+namePatches);
 
