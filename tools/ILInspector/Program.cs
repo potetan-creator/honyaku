@@ -214,7 +214,7 @@ if(saveLocal==convenienceLocal)throw new Exception("Save and Convenience locals 
 var ret=ctor.Body.Instructions.Last(x=>x.OpCode==OpCodes.Ret);
 void InjectCheck(int local,string key,string label,string tip){
  var v=ctor.Body.Variables[local];
- var prop=Method(settings,"get_"+key,0), setter=Method(settings,"set_"+key,1);
+ var prop=Method(settings,"get_"+key,0); var setter=Method(settings,"set_"+key,1);
  // StackPanel.Children.Add(this.Toggle(label, GameSettings.prop, new Action<bool>(GameSettings.set_prop), tip, null))
  var ins=new Instruction[]{
    Instruction.Create(OpCodes.Ldloc,v),
