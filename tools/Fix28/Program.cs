@@ -124,12 +124,12 @@ var fetchTarget=Instruction.Create(OpCodes.Ldloc_0);
 lastil.Replace(oldTarget,fetchTarget);
 lastil.InsertAfter(fetchTarget,Instruction.Create(OpCodes.Callvirt,getStoredTarget));
 var setLast=Method(spar,"set_Last");
-var store=setLast.Body.Instructions.Single(i=>i.Operand is MethodReference mr&&mr.Name=="set_LandSpar");
+var storeLast=setLast.Body.Instructions.Single(i=>i.Operand is MethodReference mr&&mr.Name=="set_LandSpar");
 var setil=setLast.Body.GetILProcessor();
 foreach(var (from,to) in new[]{(Method(Type("CdsHelper.Game.UI.Views.LandSparDialog/Setup"),"get_Sort"),setStoredSort),
                                 (Method(Type("CdsHelper.Game.UI.Views.LandSparDialog/Setup"),"get_Target"),setStoredTarget)}){
  foreach(var inst in new[]{Instruction.Create(OpCodes.Dup),Instruction.Create(OpCodes.Ldloca_S,setLast.Body.Variables[0]),
-                            Instruction.Create(OpCodes.Call,from),Instruction.Create(OpCodes.Callvirt,to)})setil.InsertBefore(store,inst);
+                            Instruction.Create(OpCodes.Call,from),Instruction.Create(OpCodes.Callvirt,to)})setil.InsertBefore(storeLast,inst);
 }
 log.Add("GameSettings.LandSpar now saves and restores Sort and Target instead of resetting them.");
 
