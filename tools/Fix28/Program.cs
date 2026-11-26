@@ -173,8 +173,23 @@ var manualTargets=new Instruction[]{
  Instruction.Create(OpCodes.Callvirt,fill.Body.Instructions.Select(i=>i.Operand).OfType<MethodReference>().First(m=>m.Name=="set_SelectedIndex")),
  Instruction.Create(OpCodes.Ret)
 };
+// In free mode do not leave a misleading city/person visible in the disabled target selector.
+var sourceOps=fill.Body.Instructions.Select(i=>i.Operand).OfType<MethodReference>().ToArray();
+var getItems=sourceOps.First(x=>x.Name=="get_Items"&&x.ReturnType.FullName.Contains("ItemCollection"));
+var clearItems=sourceOps.First(x=>x.Name=="Clear"&&x.DeclaringType.FullName.Contains("ItemCollection"));
+var addItems=sourceOps.First(x=>x.Name=="Add"&&x.DeclaringType.FullName.Contains("ItemCollection"));
+var selectedIndexSetter=sourceOps.First(x=>x.Name=="set_SelectedIndex");
 var afterIf=manualTargets[4].Operand as Instruction??throw new Exception("manual branch target");
 foreach(var x in manualTargets)fillil.InsertBefore(top,x);
+// Place a genuine "no opponent" label before selecting index 0.
+var targetDisplay=new Instruction[]{
+ Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldfld,targetField),
+ Instruction.Create(OpCodes.Callvirt,getItems),Instruction.Create(OpCodes.Callvirt,clearItems),
+ Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldfld,targetField),
+ Instruction.Create(OpCodes.Callvirt,getItems),Instruction.Create(OpCodes.Ldstr,"（自由模擬戦：相手指定なし）"),
+ Instruction.Create(OpCodes.Callvirt,addItems),Instruction.Create(OpCodes.Pop)
+};
+foreach(var item in targetDisplay)fillil.InsertBefore(manualTargets[9],item);
 fillil.InsertBefore(top,afterIf);
 foreach(var x in new[]{
  Instruction.Create(OpCodes.Ldarg_0),Instruction.Create(OpCodes.Ldfld,targetField),
