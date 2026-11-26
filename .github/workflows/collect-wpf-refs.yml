@@ -14,7 +14,12 @@ jobs:
       - name: Collect Windows Desktop reference DLLs
         shell: pwsh
         run: |
-          $candidates=@(Get-ChildItem "C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending)
+          @'
+          <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><EnableWindowsTargeting>true</EnableWindowsTargeting></PropertyGroup></Project>
+          '@ | Set-Content -Encoding utf8 refprobe.csproj
+          dotnet restore refprobe.csproj --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'WPF 10 ref restore failed' }
+          $candidates=@(Get-ChildItem "C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '10.*' } | Sort-Object Name -Descending)
           if($candidates.Count -eq 0) { throw 'No WindowsDesktop.Ref pack available' }
           $src=Join-Path $candidates[0].FullName 'ref\net10.0'
           New-Item -ItemType Directory refs -Force | Out-Null
