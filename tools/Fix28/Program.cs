@@ -209,9 +209,19 @@ int commandStrings=0;
 foreach(var owner in new[]{battle,Type("CdsHelper.Game.UI.Views.LandBattleScene")}){
  foreach(var method in owner.Methods.Where(m=>m.HasBody)){
   foreach(var ldstr in method.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ldstr&&i.Operand is string).ToArray()){
-   if(!commandTranslations.TryGetValue((string)ldstr.Operand,out var ja))continue;
-   ldstr.Operand=ja;
-   commandStrings++;
+   string originalUi=(string)ldstr.Operand;
+   if(commandTranslations.TryGetValue(originalUi,out var ja)){
+     ldstr.Operand=ja;commandStrings++;continue;
+   }
+   // The compiler inlines const titles within padded interpolated strings.
+   if(owner.FullName.Contains("LandBattleScene") && originalUi.Contains("공격명령",StringComparison.Ordinal)){
+     ldstr.Operand=originalUi.Replace("공격명령","攻撃命令",StringComparison.Ordinal);
+     commandStrings++;continue;
+   }
+   if(owner.FullName.Contains("LandBattleScene") && originalUi.Contains("기습명령",StringComparison.Ordinal)){
+     ldstr.Operand=originalUi.Replace("기습명령","奇策命令",StringComparison.Ordinal);
+     commandStrings++;continue;
+   }
   }
  }
 }
