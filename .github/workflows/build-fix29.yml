@@ -1,0 +1,26 @@
+name: Build Fix29 live combobox selection UI editor
+on:
+  push:
+    branches:
+      - chatgpt/cdshelper-fix29-combobox-ui-refresh-20261126
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build self-contained Cecil binary editor
+        shell: pwsh
+        run: |
+          dotnet publish tools/Fix29/Fix29.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o out --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fix29-IL-Editor
+          path: out/*
+          if-no-files-found: error
