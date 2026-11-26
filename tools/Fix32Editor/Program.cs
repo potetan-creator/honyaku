@@ -62,7 +62,7 @@ onSelected.Parameters.Add(new ParameterDefinition("sender",ParameterAttributes.N
 onSelected.Parameters.Add(new ParameterDefinition("e",ParameterAttributes.None,module.ImportReference(cbArgs)));
 owner.Methods.Add(onSelected);
 onSelected.Body.InitLocals=true;onSelected.Body.MaxStackSize=4;
-var selectedBox=new VariableDefinition(cb),selectedItem=new VariableDefinition(cbi),selectedText=new VariableDefinition(module.TypeSystem.String);
+var selectedBox=new VariableDefinition(cb); var selectedItem=new VariableDefinition(cbi); var selectedText=new VariableDefinition(module.TypeSystem.String);
 foreach(var v in new[]{selectedBox,selectedItem,selectedText})onSelected.Body.Variables.Add(v);
 var si=onSelected.Body.GetILProcessor();
 var done=Instruction.Create(OpCodes.Ret);
