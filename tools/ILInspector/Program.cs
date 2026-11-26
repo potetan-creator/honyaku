@@ -242,7 +242,7 @@ InjectCheck(convenienceLocal,names[2],"마우스 옆 단추 ESC","마우스의 �
 
 // The donor was built without upstream's assembly version. Never introduce its 1.0.0.0 reference!
 foreach(var aref in baseMod.AssemblyReferences.Where(a=>a.Name=="CdsHelper.Support"))
-  aref.Version=baseMod.Assembly.Version;
-Console.WriteLine("Final internal version="+baseMod.Assembly.Version);
+  aref.Version=baseMod.Assembly.Name.Version;
+Console.WriteLine("Final internal version="+baseMod.Assembly.Name.Version);
 baseMod.Write(args[2],new WriterParameters{WriteSymbols=false});
 Console.WriteLine("SUCCESS write "+args[2]);
