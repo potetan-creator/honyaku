@@ -1,0 +1,86 @@
+name: Build CdsHelper.Game Fix19 DLL
+
+on:
+  push:
+    branches:
+      - chatgpt/cdshelper-fix19-dll-20261126
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout temporary patch branch
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Fetch exact upstream v1.2.46
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v1.2.46 https://github.com/Kyeongrok/cds-remake.git upstream
+          if ($LASTEXITCODE -ne 0) { throw 'Upstream fetch failed' }
+
+      - name: Apply all 16 checked patches
+        shell: pwsh
+        run: |
+          @'
+          import base64, json, zlib, pathlib, sys, hashlib
+          payload = pathlib.Path('.github/cdshelper/patches.zlib.b64').read_text(encoding='utf-8').strip()
+          patches = json.loads(zlib.decompress(base64.b64decode(payload)))
+          assert len(patches) == 16, f'Expected 16 patches: {len(patches)}'
+          changed = 0
+          paths = {}
+          for patch in patches:
+              path = pathlib.Path('upstream') / patch['file']
+              if path not in paths:
+                  original = path.read_text(encoding='utf-8-sig')
+                  paths[path] = original
+              current = paths[path]
+              old, new = patch['before'], patch['after']
+              n = current.count(old)
+              if n != 1:
+                  sys.exit(f'Missing or ambiguous patch {patch["title"]} at {path}, matches {n}')
+              paths[path] = current.replace(old, new, 1)
+              changed += 1
+          for path, content in paths.items():
+              path.write_text(content, encoding='utf-8-sig' if path.read_bytes().startswith(b'\xef\xbb\xbf') else 'utf-8')
+          print(f'Applied {changed} patches in {len(paths)} files')
+          '@ | Set-Content -Encoding utf8 apply.py
+          python apply.py
+          if ($LASTEXITCODE -ne 0) { throw 'Patch check failed' }
+
+      - name: Compile DLL
+        shell: pwsh
+        run: |
+          dotnet --info
+          dotnet build upstream/CdsHelper.Game/CdsHelper.Game.csproj -c Release -p:EnableWindowsTargeting=true --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+
+      - name: Stage DLL and checksum
+        shell: pwsh
+        run: |
+          $found = @(Get-ChildItem upstream/CdsHelper.Game/bin/Release -Filter CdsHelper.Game.dll -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/](ref|refint)[\\/]' })
+          if ($found.Count -lt 1) { throw 'DLL not generated' }
+          New-Item -ItemType Directory -Force result | Out-Null
+          Copy-Item $found[0].FullName result/CdsHelper.Game.dll
+          $sum = (Get-FileHash -Algorithm SHA256 result/CdsHelper.Game.dll).Hash
+          "Source: Kyeongrok/cds-remake tag v1.2.46" | Set-Content -Encoding utf8 result/BUILD_REPORT.txt
+          "Source patches: 16" | Add-Content result/BUILD_REPORT.txt
+          "SHA256: $sum" | Add-Content result/BUILD_REPORT.txt
+          Get-Item result/CdsHelper.Game.dll | Select-Object FullName, Length
+          Write-Host "BUILT_SHA256=$sum"
+
+      - name: Upload compiled DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: CdsHelper-Game-Fix19-v1.2.46
+          path: result/*
+          if-no-files-found: error
