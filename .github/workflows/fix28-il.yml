@@ -12,8 +12,11 @@ jobs:
           dotnet-version: 10.0.x
       - shell: pwsh
         run: |
+          dotnet build tools/Fix28/Fix28.csproj -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Build donor failed' }
           dotnet publish tools/Fix28/Fix28.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o out --nologo
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          Copy-Item tools/Fix28/bin/Release/net10.0/Fix28.dll out/Fix28-Donor.dll -Force
       - uses: actions/upload-artifact@v4
         with:
           name: Fix28-ILTool
