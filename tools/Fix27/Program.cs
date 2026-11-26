@@ -28,7 +28,7 @@ foreach(var name in new[]{"DescribeCondition","DescribeBody"}){
  var method=hist.Methods.Single(x=>x.Name==name);
  foreach(var i in method.Body.Instructions.ToArray()){
   if(i.Operand is MethodReference mr){
-   if(mr.Name=="Invoke"&&mr.ReturnType.FullName=="System.String"&&mr.DeclaringType.FullName.StartsWith("System.Func")&&mr.DeclaringType.FullName.Contains("System.Int32,System.String")){
+   if(mr.Name=="Invoke"&&mr.ReturnType.FullName=="System.String"){
       Add(method,i,"Translate city/nation/discovery names");continue;
    }
    if(name=="DescribeBody"&&mr.ReturnType.FullName=="System.String"&&
