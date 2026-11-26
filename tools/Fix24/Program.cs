@@ -20,7 +20,7 @@ var lang = types.Single(t=>t.FullName=="CdsHelper.Game.Local.Helpers.Lang");
 var textMethod=lang.Methods.Single(m=>m.Name=="T" && m.IsStatic && m.Parameters.Count==1 && m.Parameters[0].ParameterType.FullName=="System.String");
 var log=new List<string>{"INPUT "+ident,"MVID "+mvid};
 int searchPatches=0;
-int labelPatches=0;
+
 int cityPatches=0;
 int namePatches=0;
 int inspect=0;
@@ -78,6 +78,7 @@ var replacements=new (string From,string To)[]{
  ("멸망","滅亡"),("등장","登場"),("공략","攻略"),("있음","存在"),("없음","なし"),
  (" 아님","ではない"),("켬","有効"),("끔","無効"),
  ("능력 ","能力 "),("상태 ","状態 "),
+ ("또는","または"),("그리고","かつ"),(") 「","）「"),
  ("년 ","年"),("년","年"),("월","月"),
  ("모르는","不明"),("없다","ない"),
 };
@@ -96,28 +97,9 @@ foreach(var method in city.Methods.Where(m=>m.HasBody && (m.Name=="DescribeBody"
 if(cityPatches<5)throw new Exception("History label patches unexpectedly few; no DLL written");
 log.Add("History literals changed "+cityPatches);
 
-// Dynamic subtitles and date units in the developer interface (spouse picker).
-// Do NOT replace status predicates in unrelated gameplay.
-var devType=types.Single(t=>t.FullName=="CdsHelper.Game.UI.Views.DevDialog");
-var devReplacements=new (string From,string To)[]{
-  ("년 · 지금 ","年・現在"),("년 · ","年・"),("살", "歳"),
-  ("~","～"),
-};
-foreach (var method in devType.Methods.Where(m=>m.HasBody))
-{
-  foreach(var ins in method.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ldstr && i.Operand is string))
-  {
-    var source=(string)ins.Operand;
-    if(!source.Contains("년") && !source.Contains("살"))continue;
-    // Limit changes to Korean unit strings or formatted text, never comments or numeric constants.
-    var fixedString=source;
-    foreach(var (from,to) in devReplacements)fixedString=fixedString.Replace(from,to,StringComparison.Ordinal);
-    // A Japanese dialog title is not changed here. TranslatedLanguage handles names.
-    if(source!=fixedString) {ins.Operand=fixedString;labelPatches++;log.Add("DEV DATE "+method.Name+": "+source+" => "+fixedString);}
-  }
-}
-log.Add("DevDate labels changed "+labelPatches);
-if(labelPatches<1)throw new Exception("Couldn't find spouse date unit strings; no DLL written");
+// Date and age captions are localized by patterns in lang/ja.json.
+// Do not globally replace short Korean syllables; they occur inside unrelated words.
+log.Add("Developer date/age localization through lang/ja.json templates.");
 
 // The user's custom setting and four Fix23 modes must remain.
 foreach(var name in new[]{"ForeignInnManualSave","FlexibleInnStay","SideMouseAsEscape","KeepSuspendOnManualSave","UnlimitedSkillLanguageCap"})
