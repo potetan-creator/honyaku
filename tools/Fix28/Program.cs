@@ -79,6 +79,60 @@ var battleBefore=string.Join("\n",battle.Methods.Where(m=>m.IsConstructor&&!m.Is
 
 // In free mode, no target is selected: this makes the existing Play fallback use the
 // hand-specified units, men, terrain and culture, rather than overriding with target values.
+// Persist formerly lost mode and opponent selection in game-settings.json.
+// Legacy JSON without these properties defaults to normal Town battle and no target.
+var settingsData=Type("CdsHelper.Game.Local.Settings.LandSparData");
+(MethodDefinition getter,MethodDefinition setter) AddIntProperty(string propName,int defaultValue){
+ var backing=new FieldDefinition("<"+propName+">k__BackingField", FieldAttributes.Private,module.TypeSystem.Int32);
+ settingsData.Fields.Add(backing);
+ var getter=new MethodDefinition("get_"+propName,
+   MethodAttributes.Public|MethodAttributes.SpecialName|MethodAttributes.HideBySig,module.TypeSystem.Int32);
+ getter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ldarg_0));
+ getter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ldfld,backing));
+ getter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ret));
+ settingsData.Methods.Add(getter);
+ var setter=new MethodDefinition("set_"+propName,
+   MethodAttributes.Public|MethodAttributes.SpecialName|MethodAttributes.HideBySig,module.TypeSystem.Void);
+ setter.Parameters.Add(new ParameterDefinition("value",ParameterAttributes.None,module.TypeSystem.Int32));
+ setter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ldarg_0));
+ setter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ldarg_1));
+ setter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Stfld,backing));
+ setter.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ret));
+ settingsData.Methods.Add(setter);
+ settingsData.Properties.Add(new PropertyDefinition(propName,PropertyAttributes.None,module.TypeSystem.Int32){GetMethod=getter,SetMethod=setter});
+ var initializer=Method(settingsData,".ctor");
+ var returnAt=initializer.Body.Instructions.Last(i=>i.OpCode==OpCodes.Ret);
+ var pil=initializer.Body.GetILProcessor();
+ pil.InsertBefore(returnAt,Instruction.Create(OpCodes.Ldarg_0));
+ pil.InsertBefore(returnAt,Instruction.Create(OpCodes.Ldc_I4,defaultValue));
+ pil.InsertBefore(returnAt,Instruction.Create(OpCodes.Stfld,backing));
+ return (getter,setter);
+}
+var (getStoredSort,setStoredSort)=AddIntProperty("Sort",2);
+var (getStoredTarget,setStoredTarget)=AddIntProperty("Target",-1);
+var getLast=Method(spar,"get_Last");
+var setupCtor=getLast.Body.Instructions.Single(i=>i.OpCode==OpCodes.Newobj&&i.Operand is MethodReference mr&&mr.DeclaringType.FullName.Contains("LandSparDialog/Setup")&&mr.Parameters.Count==8);
+var oldTarget=setupCtor.Previous;
+var oldSort=oldTarget?.Previous;
+if(oldTarget?.OpCode!=OpCodes.Ldc_I4_M1||oldSort?.OpCode!=OpCodes.Ldc_I4_2)
+ throw new Exception("Expected old Last constructor hardcoded Sort=Town, Target=-1.");
+var lastil=getLast.Body.GetILProcessor();
+var fetchSort=Instruction.Create(OpCodes.Ldloc_0);
+lastil.Replace(oldSort,fetchSort);
+lastil.InsertAfter(fetchSort,Instruction.Create(OpCodes.Callvirt,getStoredSort));
+var fetchTarget=Instruction.Create(OpCodes.Ldloc_0);
+lastil.Replace(oldTarget,fetchTarget);
+lastil.InsertAfter(fetchTarget,Instruction.Create(OpCodes.Callvirt,getStoredTarget));
+var setLast=Method(spar,"set_Last");
+var store=setLast.Body.Instructions.Single(i=>i.Operand is MethodReference mr&&mr.Name=="set_LandSpar");
+var setil=setLast.Body.GetILProcessor();
+foreach(var (from,to) in new[]{(Method(Type("CdsHelper.Game.UI.Views.LandSparDialog/Setup"),"get_Sort"),setStoredSort),
+                                (Method(Type("CdsHelper.Game.UI.Views.LandSparDialog/Setup"),"get_Target"),setStoredTarget)}){
+ foreach(var inst in new[]{Instruction.Create(OpCodes.Dup),Instruction.Create(OpCodes.Ldloca_S,setLast.Body.Variables[0]),
+                            Instruction.Create(OpCodes.Call,from),Instruction.Create(OpCodes.Callvirt,to)})setil.InsertBefore(store,inst);
+}
+log.Add("GameSettings.LandSpar now saves and restores Sort and Target instead of resetting them.");
+
 var targetMethod=Method(spar,"PickedTarget");
 var start=targetMethod.Body.Instructions[0];
 var sortField=Field(spar,"_sort");
