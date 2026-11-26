@@ -1,0 +1,21 @@
+name: Build Fix32 Editor.exe dropdown display editor
+on:
+  push:
+    branches: [chatgpt/cdshelper-fix32-combobox-20261126]
+jobs:
+  compile:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - shell: pwsh
+        run: |
+          dotnet publish tools/Fix32Editor/Fix32Editor.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o out --nologo
+          if($LASTEXITCODE -ne 0){throw 'Fix32Editor build failed'}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fix32-Editor-IL-Editor
+          path: out/*
