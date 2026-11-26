@@ -73,8 +73,9 @@ var itemPage=ud.Methods.Single(m=>m.Name=="ItemPage"&&m.HasBody);
 var itemStrings=itemPage.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ldelem_Ref).ToArray();
 if(itemStrings.Length<2)throw new Exception("Expected category/backdrop string arrays in ItemPage: "+itemStrings.Length);
 foreach(var i in itemStrings.Take(2))TranslateAfter(itemPage,i,"item category/backdrop dropdown item");
-var ctorBeforeFirstLicense=dlgCtor.Body.Instructions.FirstOrDefault(i=>i.Operand is MethodReference mr&&
- mr.Name=="get_Licenses"&&mr.DeclaringType.FullName.Contains("UserDiscoveries"));
+var ctorBeforeFirstLicense=dlgCtor.Body.Instructions.FirstOrDefault(i=>
+ (i.Operand is MethodReference mr && mr.Name=="get_Licenses"&&mr.DeclaringType.FullName.Contains("UserDiscoveries")) ||
+ (i.Operand is FieldReference fr && fr.Name=="Licenses"&&fr.DeclaringType.FullName.Contains("UserDiscoveries")));
 if(ctorBeforeFirstLicense==null)throw new Exception("Custom licenses anchor not found");
 var prefix=dlgCtor.Body.Instructions.Take(dlgCtor.Body.Instructions.IndexOf(ctorBeforeFirstLicense)).Where(i=>i.OpCode==OpCodes.Ldelem_Ref).ToArray();
 if(prefix.Length!=1)throw new Exception("Unexpected discovery category array count "+prefix.Length);
