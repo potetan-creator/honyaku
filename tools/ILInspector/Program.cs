@@ -16,7 +16,7 @@ TypeDefinition D(string fullname)=>dt.TryGetValue(fullname,out var t)?t:throw ne
 TypeReference TypeMap(TypeReference t) {
  if(t is GenericInstanceType g) {
    var n=new GenericInstanceType(TypeMap(g.ElementType));
-   foreach(var a in g.GenericArguments)n.GenericArguments.Add(TypeMap(a));
+   foreach(var genericArg in g.GenericArguments)n.GenericArguments.Add(TypeMap(genericArg));
    return n;
  }
  if(t is ArrayType a)return new ArrayType(TypeMap(a.ElementType),a.Rank);
@@ -72,7 +72,7 @@ void CopyBody(MethodDefinition from,MethodDefinition into) {
      MethodReference m=>MethodMap(m),
      FieldReference f=>FieldMap(f),
      TypeReference t=>TypeMap(t),
-     CallSite site=>baseMod.ImportReference(site),
+     CallSite site=>site,
      _=>orig.Operand
    };
  }
