@@ -6,10 +6,13 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Text;
 
-if (args.Length != 2) throw new ArgumentException("Usage: Fix30 input-Fix29.dll output-Fix30.dll");
+if (args.Length != 3) throw new ArgumentException("Usage: Fix30 input-Fix29.dll output-Fix30.dll windowsdesktop-ref-dir");
 string input=Path.GetFullPath(args[0]),output=Path.GetFullPath(args[1]);
 if(input==output)throw new Exception("Cannot overwrite original");
-var assembly=AssemblyDefinition.ReadAssembly(input,new ReaderParameters{InMemory=true,ReadSymbols=false});
+var resolver=new DefaultAssemblyResolver();
+resolver.AddSearchDirectory(args[2]);
+resolver.AddSearchDirectory(Path.GetDirectoryName(input)!);
+var assembly=AssemblyDefinition.ReadAssembly(input,new ReaderParameters{InMemory=true,ReadSymbols=false,AssemblyResolver=resolver});
 var mod=assembly.MainModule;
 string identity=assembly.Name.FullName;Guid mvid=mod.Mvid;
 var audit=new List<string>();
