@@ -197,6 +197,27 @@ foreach(var x in new[]{
  fillil.InsertBefore(top,x);
 log.Add("FillTargets: opponent ComboBox disabled only in Free mode; original Town/Field logic untouched.");
 
+// Localize battle commands visible on the original battle screen.
+// Only change UI string literals, never numerical battle rules or command indices.
+var commandTranslations=new Dictionary<string,string>{
+ {"공격명령","攻撃命令"},{"통상공격","通常攻撃"},{"방어중시공격","防御重視攻撃"},
+ {"돌격","突撃"},{"일기토","一騎討ち"},{"퇴각","退却"},{"묘책","奇策"},
+ {"애니메이션","アニメーション"},{"기습명령","奇策命令"},
+ {"기습","奇襲"},{"함정","罠"},{"암살자","暗殺者"},{"심판","審判"}
+};
+int commandStrings=0;
+foreach(var owner in new[]{battle,Type("CdsHelper.Game.UI.Views.LandBattleScene")}){
+ foreach(var method in owner.Methods.Where(m=>m.HasBody)){
+  foreach(var ldstr in method.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ldstr&&i.Operand is string).ToArray()){
+   if(!commandTranslations.TryGetValue((string)ldstr.Operand,out var ja))continue;
+   ldstr.Operand=ja;
+   commandStrings++;
+  }
+ }
+}
+if(commandStrings<7)throw new Exception("Battle command translation anchors too few: "+commandStrings);
+log.Add("Localized "+commandStrings+" battle command labels and titles in combat UI.");
+
 // Name matching normalization: katakana/hiragana equivalents, NFKC, common interpuncts/spaces/equal signs.
 var lang=Type("CdsHelper.Game.Local.Helpers.Lang");
 var stringType=module.TypeSystem.String;
