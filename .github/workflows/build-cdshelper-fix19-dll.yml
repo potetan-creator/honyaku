@@ -1,4 +1,4 @@
-name: Build CdsHelper.Game Fix19 DLL
+name: Build CdsHelper.Game Fix20 DLL
 
 on:
   push:
@@ -57,6 +57,20 @@ jobs:
           python apply.py
           if ($LASTEXITCODE -ne 0) { throw 'Patch check failed' }
 
+      - name: Integrate 4 mode toggles in game settings and UI
+        shell: pwsh
+        run: |
+          @'
+          import base64, zlib, pathlib
+          payload = pathlib.Path('.github/cdshelper/fix20_modes.py.zlib.b64').read_text().strip()
+          script = zlib.decompress(base64.b64decode(payload)).decode('utf-8')
+          pathlib.Path('apply_mode_fix20.py').write_text(script, encoding='utf-8')
+          '@ | Set-Content -Encoding utf8 unpack_modes.py
+          python unpack_modes.py
+          if ($LASTEXITCODE -ne 0) { throw 'Fix20 unpack failed' }
+          python apply_mode_fix20.py upstream
+          if ($LASTEXITCODE -ne 0) { throw 'Fix20 mode patch failed' }
+
       - name: Compile DLL
         shell: pwsh
         run: |
@@ -73,7 +87,7 @@ jobs:
           Copy-Item $found[0].FullName result/CdsHelper.Game.dll
           $sum = (Get-FileHash -Algorithm SHA256 result/CdsHelper.Game.dll).Hash
           "Source: Kyeongrok/cds-remake tag v1.2.46" | Set-Content -Encoding utf8 result/BUILD_REPORT.txt
-          "Source patches: 16" | Add-Content result/BUILD_REPORT.txt
+          "Source patches: 16 Fix19 + 12 Fix20" | Add-Content result/BUILD_REPORT.txt
           "SHA256: $sum" | Add-Content result/BUILD_REPORT.txt
           Get-Item result/CdsHelper.Game.dll | Select-Object FullName, Length
           Write-Host "BUILT_SHA256=$sum"
@@ -81,6 +95,6 @@ jobs:
       - name: Upload compiled DLL
         uses: actions/upload-artifact@v4
         with:
-          name: CdsHelper-Game-Fix19-v1.2.46
+          name: CdsHelper-Game-Fix20-Modes-v1.2.46
           path: result/*
           if-no-files-found: error
