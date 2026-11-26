@@ -181,7 +181,7 @@ var stackType=baseMod.ImportReference(typeof(object)); // The actual StackPanel 
 var childs=ctor.Body.Instructions.Select(x=>x.Operand).OfType<MethodReference>().First(x=>x.FullName.Contains("System.Windows.Controls.Panel::get_Children()"));
 var add=ctor.Body.Instructions.Select(x=>x.Operand).OfType<MethodReference>().First(x=>x.FullName.Contains("System.Windows.Controls.UIElementCollection::Add("));
 var toggle=modDialog.Methods.Single(x=>x.Name=="Toggle"&&x.Parameters.Count==5);
-var actionCtor=ctor.Body.Instructions.Select(x=>x.Operand).OfType<MethodReference>().First(x=>x.FullName.Contains("System.Action\`1<System.Boolean>::.ctor"));
+var actionCtor=ctor.Body.Instructions.Select(x=>x.Operand).OfType<MethodReference>().First(x=>x.FullName.Contains("System.Action"+"`1<System.Boolean>::.ctor"));
 int SaveSlotLocal(){
  var all=ctor.Body.Instructions; var marker=all.Single(i=>i.Operand is MethodReference m&&m.FullName.Contains("GameSettings::get_SaveSlotPick()"));
  var idx=all.IndexOf(marker);
