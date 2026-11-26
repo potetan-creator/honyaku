@@ -4,9 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-if(args.Length!=3) throw new Exception("Usage ILPatcher original.dll fix20.dll output.dll");
-var baseMod=ModuleDefinition.ReadModule(args[0],new ReaderParameters{ReadSymbols=false,InMemory=true});
-var donor=ModuleDefinition.ReadModule(args[1],new ReaderParameters{ReadSymbols=false,InMemory=true});
+if(args.Length!=4) throw new Exception("Usage ILPatcher original.dll fix20.dll output.dll windows-desktop-ref-dir");
+var resolver=new DefaultAssemblyResolver();
+resolver.AddSearchDirectory(args[3]);
+var baseMod=ModuleDefinition.ReadModule(args[0],new ReaderParameters{ReadSymbols=false,InMemory=true,AssemblyResolver=resolver});
+var donor=ModuleDefinition.ReadModule(args[1],new ReaderParameters{ReadSymbols=false,InMemory=true,AssemblyResolver=resolver});
 Console.WriteLine("BASE "+baseMod.Assembly.FullName+" MVID="+baseMod.Mvid);
 Console.WriteLine("DONOR "+donor.Assembly.FullName);
 var types=baseMod.GetTypes().ToDictionary(t=>t.FullName);
@@ -238,5 +240,9 @@ InjectCheck(saveLocal,names[3],"일반 저장 뒤 중단 저장 보존","일반 
 InjectCheck(convenienceLocal,names[1],"숙박 일수 직접 지정","여관 숙박을 1~127일 중 선택します。料金は一か月分で固定。基本OFF.");
 InjectCheck(convenienceLocal,names[2],"마우스 옆 단추 ESC","마우스의 네 번째·다섯 번째 단추를 ESC로 사용합니다. 기본OFF.");
 
+// The donor was built without upstream's assembly version. Never introduce its 1.0.0.0 reference!
+foreach(var aref in baseMod.AssemblyReferences.Where(a=>a.Name=="CdsHelper.Support"))
+  aref.Version=baseMod.Assembly.Version;
+Console.WriteLine("Final internal version="+baseMod.Assembly.Version);
 baseMod.Write(args[2],new WriterParameters{WriteSymbols=false});
 Console.WriteLine("SUCCESS write "+args[2]);
