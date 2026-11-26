@@ -71,8 +71,8 @@ foreach(var fieldName in new[]{"_category","_itemCategory","_itemBackdrop"}){
 // so translating choices as they are first created preserves all stored values.
 var itemPage=ud.Methods.Single(m=>m.Name=="ItemPage"&&m.HasBody);
 var itemStrings=itemPage.Body.Instructions.Where(i=>i.OpCode==OpCodes.Ldelem_Ref).ToArray();
-if(itemStrings.Length!=2)throw new Exception("Expected 2 string arrays in ItemPage: "+itemStrings.Length);
-foreach(var i in itemStrings)TranslateAfter(itemPage,i,"item category/backdrop dropdown item");
+if(itemStrings.Length<2)throw new Exception("Expected category/backdrop string arrays in ItemPage: "+itemStrings.Length);
+foreach(var i in itemStrings.Take(2))TranslateAfter(itemPage,i,"item category/backdrop dropdown item");
 var ctorBeforeFirstLicense=dlgCtor.Body.Instructions.FirstOrDefault(i=>i.Operand is MethodReference mr&&
  mr.Name=="get_Licenses"&&mr.DeclaringType.FullName.Contains("UserDiscoveries"));
 if(ctorBeforeFirstLicense==null)throw new Exception("Custom licenses anchor not found");
