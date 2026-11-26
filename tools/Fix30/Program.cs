@@ -53,7 +53,7 @@ int fieldStrings=Sync(ctor,i=>i.OpCode==OpCodes.Ldelem_Ref,
  "Terrain and culture names before dropdown addition");
 if(fieldStrings!=2) throw new Exception("Expected exactly 2 field/culture arrays, got "+fieldStrings);
 int sortStrings=Sync(ctor,i=>i.OpCode==OpCodes.Ldfld&&i.Operand is FieldReference fr&&
- fr.Name=="Item1"&&fr.DeclaringType.FullName.Contains("ValueTuple")&&fr.FieldType.FullName=="System.String",
+ fr.Name=="Item1"&&fr.DeclaringType.FullName.Contains("ValueTuple"),
  "Battle mode names before dropdown addition");
 if(sortStrings!=1)throw new Exception("Expected mode tuple name in ctor, found "+sortStrings);
 
