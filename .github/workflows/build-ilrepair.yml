@@ -1,0 +1,21 @@
+name: Build Fix22 IL repair tool
+on:
+  push:
+    branches: [chatgpt/cdshelper-fix22-verify-20261126]
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - shell: pwsh
+        run: |
+          dotnet publish tools/ILRepair/ILRepair.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o output --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'ILRepair publish failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ILRepairLinux
+          path: output/*
