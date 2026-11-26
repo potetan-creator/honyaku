@@ -1,8 +1,8 @@
-name: Build Fix30 Japanese battle and sample discovery UI patcher
+name: Build Fix31 safe Japanese UI translation patcher
 on:
   push:
     branches:
-      - chatgpt/cdshelper-fix30-locale-20261126
+      - chatgpt/cdshelper-fix31-stable-ui-20261126
 permissions:
   contents: read
 jobs:
@@ -21,6 +21,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Failed build' }
       - uses: actions/upload-artifact@v4
         with:
-          name: Fix30-IL-Editor
+          name: Fix31-IL-Editor
           path: out/*
           if-no-files-found: error
