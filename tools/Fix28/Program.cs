@@ -43,10 +43,33 @@ var tupleCtor=instructions.Skip(instructions.IndexOf(newArray)).Take(idx-instruc
 var il=cctor.Body.GetILProcessor();
 foreach(var instruction in new[]{
  Instruction.Create(OpCodes.Dup),Instruction.Create(OpCodes.Ldc_I4_2),
- Instruction.Create(OpCodes.Ldstr,"自由模擬戦（手動編成）"),Instruction.Create(OpCodes.Ldc_I4_1),
+ Instruction.Create(OpCodes.Ldstr,"自由模擬戦（手動編成）"),Instruction.Create(OpCodes.Ldc_I4_5),
  Instruction.Create(OpCodes.Newobj,tupleCtor),Instruction.Create(OpCodes.Stelem_Any,tupleType)})
  il.InsertBefore(store,instruction);
 log.Add("Sorts: keep Town/Field unchanged; add third Free mode with LandBattle.Field rules.");
+// Third UI mode uses a distinct stored sort key 5. Only at battle construction,
+// convert it to the existing Field (1) rules while retaining manual target=-1.
+var mapFreeSort=new MethodDefinition("ResolveSparBattleSort",
+ MethodAttributes.Private|MethodAttributes.Static|MethodAttributes.HideBySig,module.TypeSystem.Int32);
+mapFreeSort.Parameters.Add(new ParameterDefinition("sort",ParameterAttributes.None,module.TypeSystem.Int32));
+spar.Methods.Add(mapFreeSort);
+var sf=mapFreeSort.Body.GetILProcessor();
+var elseSort=Instruction.Create(OpCodes.Ldarg_0);
+sf.Append(Instruction.Create(OpCodes.Ldarg_0));
+sf.Append(Instruction.Create(OpCodes.Ldc_I4_5));
+sf.Append(Instruction.Create(OpCodes.Bne_Un_S,elseSort));
+sf.Append(Instruction.Create(OpCodes.Ldc_I4_1));
+sf.Append(Instruction.Create(OpCodes.Ret));
+sf.Append(elseSort);
+sf.Append(Instruction.Create(OpCodes.Ret));
+var playMode=Method(spar,"Play");
+var secondBattleConstructor=playMode.Body.Instructions.Single(i=>i.OpCode==OpCodes.Newobj&&
+ i.Operand is MethodReference mr&&mr.DeclaringType.FullName=="CdsHelper.Game.Engine.Land.LandBattle"&&mr.Parameters.Count==10);
+var getSort=secondBattleConstructor.Previous;
+if(getSort?.Operand is not MethodReference smr || smr.Name!="get_Sort")throw new Exception("Expected setup sort just before manual battle constructor.");
+playMode.Body.GetILProcessor().InsertAfter(getSort,Instruction.Create(OpCodes.Call,mapFreeSort));
+log.Add("Free UI mode uses unique Sort=5, passed as existing Field=1 to battle constructor.");
+
 // Protect existing Town and Field automatic branches: LandSparDialog.Play and LandBattle constructors remain untouched.
 var play=Method(spar,"Play");
 var playOriginal=string.Join("\n",play.Body.Instructions.Select(x=>x.OpCode.Code+"|"+x.Operand?.ToString()));
