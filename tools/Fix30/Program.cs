@@ -35,10 +35,11 @@ int Sync(MethodDefinition m,Func<Instruction,bool> predicate,string title){
 // Restore the Japanese translation lost when Fix29 made ComboBoxes editable read-only.
 // Explicitly pass the current selected string through the normal language dictionary.
 var spar=T("CdsHelper.Game.UI.Views.LandSparDialog");
+// Fix30 crash/blank ComboBoxes rollback: leave Fix29's selection synchronization method UNCHANGED.
+// Locale conversion occurs when populating the dropdown ITEMS, not during SelectionChanged.
 var sync=spar.Methods.Single(m=>m.Name=="UpdateLiveSelectionLabel");
-var objectToString=sync.Body.Instructions.Where(i=>i.Operand is MethodReference mr&&mr.Name=="ToString"&&mr.DeclaringType.FullName=="System.Object").ToArray();
-if(objectToString.Length!=1)throw new Exception("Fix29 sync handler changed; expected exactly one object.ToString, actual "+objectToString.Length);
-Sync(sync,i=>objectToString.Contains(i),"Fix29 selection label Japanese translation");
+if(!sync.HasBody) throw new Exception("Fix29 display sync unavailable.");
+Note("Fix29 SelectionChanged method preserved byte-for-byte (no new translation call)");
 
 // Translate options in drop-down lists BEFORE ComboBoxItem.Content is set.
 // Numeric unit IDs and IsEnabled restrictions are not changed.
@@ -48,6 +49,14 @@ if(unitStrings.Length!=1)throw new Exception("Expected exactly one LandUnits.Nam
 Sync(side,i=>unitStrings.Contains(i),"Unit dropdown labels");
 
 var ctor=spar.Methods.Single(m=>m.IsConstructor&&!m.IsStatic&&m.Parameters.Count==1);
+int fieldStrings=Sync(ctor,i=>i.OpCode==OpCodes.Ldelem_Ref,
+ "Terrain and culture names before dropdown addition");
+if(fieldStrings!=2) throw new Exception("Expected exactly 2 field/culture arrays, got "+fieldStrings);
+int sortStrings=Sync(ctor,i=>i.OpCode==OpCodes.Ldfld&&i.Operand is FieldReference fr&&
+ fr.Name=="Item1"&&fr.DeclaringType.FullName.Contains("ValueTuple")&&fr.FieldType.FullName=="System.String",
+ "Battle mode names before dropdown addition");
+if(sortStrings!=1)throw new Exception("Expected mode tuple name in ctor, found "+sortStrings);
+
 int cultureStrings=Sync(ctor,i=>i.Operand is MethodReference mr&&mr.Name=="ToStringAndClear"&&mr.ReturnType.FullName=="System.String",
  "Culture selection constructed labels");
 if(cultureStrings<1)throw new Exception("Cannot patch culture label creation");
@@ -100,47 +109,19 @@ var rumor=ud.Methods.Single(m=>m.Name=="AddRumorRow"&&m.HasBody);
 int rumors=PatchSample(rumor,mr=>mr.Name=="get_Text"&&mr.DeclaringType.FullName.Contains("UserDiscoveries/RumorEntry"),"Sample rumor");
 if(rumors<1)throw new Exception("Missing rumor text patch");
 
-// Scene scripts consist of several parts. Translate the speaker and dialogue independently.
-var scene=ud.Methods.Single(m=>m.Name=="SceneText"&&m.HasBody);
-int lines=PatchSample(scene,mr=>(mr.Name=="get_Text"||mr.Name=="get_Speaker")&&mr.DeclaringType.FullName.Contains("UserDiscoveries/SceneLine"),
- "Sample event script speakers and dialogues");
-if(lines<2)throw new Exception("Failed to patch event speaker/text");
-
-// Present standard command markers in Japanese only for the READ-ONLY examples.
-// Do not touch Korean markers in the parse/edit/save path because those are script grammar.
-var marker=new MethodDefinition("SampleSceneMarkerText",MethodAttributes.Private|MethodAttributes.Static|MethodAttributes.HideBySig,mod.TypeSystem.String);
-marker.Parameters.Add(new ParameterDefinition("text",ParameterAttributes.None,mod.TypeSystem.String));
-marker.Parameters.Add(new ParameterDefinition("view",ParameterAttributes.None,ud));
-ud.Methods.Add(marker);
-var replace=mod.ImportReference(typeof(string).GetMethod("Replace",new[]{typeof(string),typeof(string)})!);
-var mi=marker.Body.GetILProcessor();
-var passthrough=Instruction.Create(OpCodes.Ldarg_0);
-mi.Append(Instruction.Create(OpCodes.Ldarg_1));
-mi.Append(Instruction.Create(OpCodes.Ldfld,exampleField));
-mi.Append(Instruction.Create(OpCodes.Brfalse,passthrough));
-mi.Append(Instruction.Create(OpCodes.Ldarg_0));
-foreach(var (key,val) in new[]{
-  ("[그림]","[画像]"),("[동영상]","[動画]"),("[발견]","[発見]"),
-  ("[해전]","[海戦]"),("[육상전]","[陸戦]"),("[아이템]","[アイテム]"),
-  ("[게임 오버]","[ゲームオーバー]"),("[효과음]","[効果音]"),("[놓쳤을 때]","[逃した場合]")}) {
- mi.Append(Instruction.Create(OpCodes.Ldstr,key));
- mi.Append(Instruction.Create(OpCodes.Ldstr,val));
- mi.Append(Instruction.Create(OpCodes.Callvirt,replace));
-}
-mi.Append(Instruction.Create(OpCodes.Call,jp));
-mi.Append(Instruction.Create(OpCodes.Ret));
-mi.Append(passthrough);mi.Append(Instruction.Create(OpCodes.Ret));
-int returns=0;
-foreach(var ins in scene.Body.Instructions.Where(x=>x.OpCode==OpCodes.Ret).ToArray()){
- var self=Instruction.Create(OpCodes.Ldarg_0);
- var il=scene.Body.GetILProcessor();
- il.InsertBefore(ins,self);
- il.InsertAfter(self,Instruction.Create(OpCodes.Call,marker));
- returns++;
-}
-Note("Read-only scene marker translations at return sites = "+returns);
-if(returns<1)throw new Exception("SceneText return missing");
-
+// IMPORTANT: do NOT modify SceneText() or ParseScene(): Fix30's SceneText method
+// patch produced InvalidProgramException while opening the read-only examples.
+// Instead, translate the completed preview string in Fill, without changing event grammar
+// or any persisted/copyable Korean script instructions.
+int displayedScenes=Sync(screenFill,i=>false,"Scene text init");
+var sceneJoin=screenFill.Body.Instructions.Where(i=>i.Operand is MethodReference mr&&
+ mr.Name=="Join"&&mr.DeclaringType.FullName=="System.String"&&mr.ReturnType.FullName=="System.String").ToArray();
+if(sceneJoin.Length!=1)throw new Exception("Expected exactly one scene string.Join in Fill, found "+sceneJoin.Length);
+var sj=sceneJoin[0];
+var viewArg=Instruction.Create(OpCodes.Ldarg_0);
+screenFill.Body.GetILProcessor().InsertAfter(sj,viewArg);
+screenFill.Body.GetILProcessor().InsertAfter(viewArg,Instruction.Create(OpCodes.Call,disp));
+Note("Read-only sample scene translated AFTER string.Join, no changes to SceneText or ParseScene");
 // Translate constructed example list titles e.g. '(예제) 돌묵상어' using exact
 // new dictionary keys while preserving UUID tags and the stored original names.
 var refresh=ud.Methods.Single(m=>m.Name=="Refresh"&&m.HasBody);
@@ -167,9 +148,9 @@ assembly.Write(output,new WriterParameters{WriteSymbols=false});
 var saved=AssemblyDefinition.ReadAssembly(output);
 if(saved.Name.FullName!=identity||saved.MainModule.Mvid!=mvid)throw new Exception("Assembly identity changed.");
 var owner=saved.MainModule.GetTypes().Single(x=>x.FullName==ud.FullName);
-if(!owner.Methods.Any(m=>m.Name=="SampleTextInCurrentLanguage")||!owner.Methods.Any(m=>m.Name=="SampleSceneMarkerText"))throw new Exception("Example translators missing.");
+if(!owner.Methods.Any(m=>m.Name=="SampleTextInCurrentLanguage"))throw new Exception("Sample translator missing.");
 Note("OUTPUT "+output+" bytes="+new FileInfo(output).Length);
 Note("ASSEMBLY "+identity+" MVID="+mvid);
 Note("PRESERVED four mode features / history translations / Japanese search / battle generation.");
-Note("PASS metadata, branch targets, and copied example translation handlers; Windows UI execution untested.");
+Note("PASS metadata, branch targets, and sample display-only translators; Windows UI execution untested.");
 File.WriteAllLines(output+".patchlog.txt",audit,new UTF8Encoding(false));
