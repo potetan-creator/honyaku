@@ -1,0 +1,110 @@
+name: Diagnose Fix20 DLL startup
+on:
+  push:
+    branches:
+      - chatgpt/cdshelper-startup-diagnosis-20261126
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: CdsHelper-Game-Fix20-Modes-v1.2.46
+          run-id: 45740012127
+          github-token: \${{ github.token }}
+          path: patched
+      - name: Download official game portable archive
+        shell: pwsh
+        run: |
+          curl.exe -fL --retry 3 --retry-all-errors -o official.zip https://github.com/Kyeongrok/cds-remake/releases/download/v1.2.46/CdsHelper-win-Portable.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Download failed' }
+          Expand-Archive official.zip -DestinationPath official
+          Get-ChildItem official -Filter CdsHelper.Game.dll -Recurse | Select-Object FullName,Length
+      - name: Load original and Fix20 into .NET 10, show loader errors
+        shell: pwsh
+        run: |
+          dotnet new console --framework net10.0 -o probe --no-restore
+          @'
+          using System;
+          using System.IO;
+          using System.Reflection;
+          using System.Linq;
+          using System.Runtime.Loader;
+          class Program {
+            static int Main(string[] args) {
+              string path=Path.GetFullPath(args[0]);
+              string dir=Path.GetDirectoryName(path)!;
+              AssemblyLoadContext.Default.Resolving+=(ctx,n)=>{
+                string f=Path.Combine(dir,n.Name+".dll");
+                return File.Exists(f)?ctx.LoadFromAssemblyPath(f):null;
+              };
+              try {
+                var a=AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+                Console.WriteLine("Assembly: "+a.FullName);
+                Console.WriteLine("References: "+string.Join(" | ",a.GetReferencedAssemblies().OrderBy(x=>x.Name).Select(x=>x.FullName)));
+                try {
+                  var types=a.GetTypes();
+                  Console.WriteLine("Types: "+types.Length);
+                  foreach(var t in types.Where(t=>t.IsPublic)) {
+                    try { var m=t.GetMembers(BindingFlags.Public|BindingFlags.Instance|BindingFlags.Static); }
+                    catch(Exception ex){Console.WriteLine("MEMBERERROR: "+t.FullName+" "+ex);}
+                  }
+                } catch(ReflectionTypeLoadException ex) {
+                  Console.WriteLine("TYPELOADERROR: "+ex);
+                  foreach(var e in ex.LoaderExceptions) Console.WriteLine("LOADER: "+e);
+                }
+              } catch(Exception ex) {Console.WriteLine("ASSEMBLYERROR: "+ex);return 1;}
+              return 0;
+            }
+          }
+          '@ | Set-Content -Encoding utf8 probe/Program.cs
+          dotnet build probe -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Probe build failed' }
+          $p=(Get-ChildItem official -Filter CdsHelper.Game.dll -Recurse | Select-Object -First 1).FullName
+          $mod=(Get-ChildItem patched -Filter CdsHelper.Game.dll -Recurse | Select-Object -First 1).FullName
+          Write-Host "OFFICIAL DLL $p"
+          Write-Host "MOD DLL $mod"
+          dotnet probe/bin/Release/net10.0/probe.dll $p | Out-File -Encoding utf8 original-probe.log
+          Copy-Item $p ($p+'.backup') -Force
+          Copy-Item $mod $p -Force
+          dotnet probe/bin/Release/net10.0/probe.dll $p | Out-File -Encoding utf8 modified-probe.log
+          Get-Content original-probe.log | Select-Object -First 35
+          Get-Content modified-probe.log | Select-Object -First 35
+      - name: Compare startup of release original and patched game
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $p=(Get-ChildItem official -Filter CdsHelper.Game.dll -Recurse | Select-Object -First 1)
+          $dir=$p.DirectoryName
+          $exe=Get-ChildItem $dir -Filter '*.exe' | Where-Object {$_.Name -match 'CostaDelSol.Play|CdsHelper'} | Select-Object -First 1
+          if (-not $exe){Write-Host 'NO_STARTUP_EXE';exit}
+          Write-Host "STARTUP_EXE=$($exe.FullName)"
+          foreach ($mode in @('original','patched')) {
+            if ($mode -eq 'original') {Copy-Item ($p.FullName+'.backup') $p.FullName -Force}
+            else {Copy-Item (Get-ChildItem patched -Filter CdsHelper.Game.dll -Recurse | Select-Object -First 1).FullName $p.FullName -Force}
+            try {
+              $process=Start-Process $exe.FullName -WorkingDirectory $dir -PassThru
+              Start-Sleep -Seconds 8
+              $process.Refresh()
+              if ($process.HasExited) {Write-Host "STARTUP:$mode exited:$($process.ExitCode)"}
+              else {Write-Host "STARTUP:$mode still-running"; Stop-Process $process.Id -Force}
+            } catch {Write-Host "STARTUP:$mode exception $($_.Exception)"}
+          }
+          Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-8)} -ErrorAction SilentlyContinue | Where-Object {$_.ProviderName -in @('.NET Runtime','Application Error')} | Select-Object -First 8 ProviderName,Id,Message | Format-List | Out-String -Width 260 | Set-Content -Encoding utf8 eventlog.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fix20-diagnosis
+          path: |
+            original-probe.log
+            modified-probe.log
+            eventlog.txt
+          if-no-files-found: warn
